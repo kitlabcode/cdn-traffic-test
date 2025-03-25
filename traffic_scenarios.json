@@ -1,0 +1,87 @@
+[
+    {
+      "name": "steady_5rps_10s_5ccur",
+      "schedule": [{"duration": 10, "requests_per_second": 5, "concurrency": 5, "payload_size": 1}]
+    },
+    {
+      "name": "burst_100req_1s_20conc",
+      "schedule": [{"duration": 1, "requests_per_second": 100, "concurrency": 20, "payload_size": 100}]
+    },
+    {
+      "name": "spike_pattern",
+      "schedule": [
+        {"duration": 5, "requests_per_second": 2, "concurrency": 2, "payload_size": 500},
+        {"duration": 2, "requests_per_second": 10, "concurrency": 10, "payload_size": 500},
+        {"duration": 8, "requests_per_second": 1, "concurrency": 1, "payload_size": 500}
+      ]
+    },
+    {
+      "name": "ramp_up_concurrency",
+      "schedule": [
+        {"duration": 2, "requests_per_second": 10, "concurrency": 2, "payload_size": 1000},
+        {"duration": 2, "requests_per_second": 10, "concurrency": 4, "payload_size": 1000},
+        {"duration": 2, "requests_per_second": 10, "concurrency": 6, "payload_size": 1000},
+        {"duration": 2, "requests_per_second": 10, "concurrency": 8, "payload_size": 1000},
+        {"duration": 2, "requests_per_second": 10, "concurrency": 10, "payload_size": 1000}
+      ]
+    },
+    {
+      "name": "ramp_down_rps",
+      "schedule": [
+        {"duration": 2, "requests_per_second": 25, "concurrency": 5, "payload_size": 500},
+        {"duration": 2, "requests_per_second": 20, "concurrency": 5, "payload_size": 500},
+        {"duration": 2, "requests_per_second": 15, "concurrency": 5, "payload_size": 500},
+        {"duration": 2, "requests_per_second": 10, "concurrency": 5, "payload_size": 500},
+        {"duration": 2, "requests_per_second": 5, "concurrency": 5, "payload_size": 500}
+      ]
+    },
+    {
+      "name": "sustained_high_load",
+      "schedule": [{"duration": 60, "requests_per_second": 20, "concurrency": 15, "payload_size": 200}]
+    },
+    {
+      "name": "mixed_payload_sizes",
+      "schedule": [
+        {"duration": 10, "requests_per_second": 5, "concurrency": 5, "payload_size": 10},
+        {"duration": 10, "requests_per_second": 5, "concurrency": 5, "payload_size": 100},
+        {"duration": 10, "requests_per_second": 5, "concurrency": 5, "payload_size": 1000},
+        {"duration": 10, "requests_per_second": 5, "concurrency": 5, "payload_size": 5000}
+      ]
+    },
+    {
+      "name": "intermittent_traffic",
+      "schedule": [
+        {"duration": 15, "requests_per_second": 10, "concurrency": 8, "payload_size": 300},
+        {"duration": 10, "requests_per_second": 0, "concurrency": 0, "payload_size": 300},
+        {"duration": 15, "requests_per_second": 10, "concurrency": 8, "payload_size": 300},
+        {"duration": 10, "requests_per_second": 0, "concurrency": 0, "payload_size": 300},
+        {"duration": 15, "requests_per_second": 10, "concurrency": 8, "payload_size": 300}
+      ]
+    },
+    {
+      "name": "complex_ramp_up_down",
+      "schedule": [
+        {"duration": 5, "requests_per_second": 5, "concurrency": 2, "payload_size": 750},
+        {"duration": 5, "requests_per_second": 10, "concurrency": 5, "payload_size": 750},
+        {"duration": 5, "requests_per_second": 15, "concurrency": 10, "payload_size": 750},
+        {"duration": 5, "requests_per_second": 10, "concurrency": 7, "payload_size": 750},
+        {"duration": 5, "requests_per_second": 5, "concurrency": 3, "payload_size": 750}
+      ]
+    },
+    {
+      "name": "high_concurrency_steady",
+      "schedule": [{"duration": 30, "requests_per_second": 30, "concurrency": 50, "payload_size": 50}]
+    },
+    {
+      "name": "long_duration_steady",
+      "schedule": [{"duration": 120, "requests_per_second": 2, "concurrency": 3, "payload_size": 150}]
+    },
+    {
+      "name": "step_up_concurrency",
+      "schedule": [
+        {"duration": 10, "requests_per_second": 10, "concurrency": 5, "payload_size": 250},
+        {"duration": 10, "requests_per_second": 10, "concurrency": 10, "payload_size": 250},
+        {"duration": 10, "requests_per_second": 10, "concurrency": 15, "payload_size": 250}
+      ]
+    }
+  ]

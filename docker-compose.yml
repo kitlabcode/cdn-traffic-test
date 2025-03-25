@@ -1,0 +1,41 @@
+services:
+  cdn-traffic-test:
+    image: cdn-traffic-test:latest
+    container_name: cdn-traffic-test
+    ports:
+      - "8090:8090"
+    environment:
+      - HOSTNAME=ats-debug-generator
+      - DATABASE_URL=postgresql://crate@cratedb:5432/doc
+    depends_on:
+      cratedb:
+        condition: service_healthy
+        
+  ats-debug-generator:
+    image: kitlabcode/ats-debug-generator:latest
+    container_name: ats-debug-generator
+    ports:
+      - "8080:8080"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DATABASE_URL=postgresql://crate@cratedb:5432/doc
+    depends_on:
+      cratedb:
+        condition: service_healthy
+
+  cratedb:
+    image: crate:latest
+    container_name: cratedb
+    ports:
+      - "5432:5432"
+      - "4200:4200"
+    environment:
+      - CRATE_HEAP_SIZE=2g
+      - CRATE_CLUSTER_NAME=crate-cluster
+    command: crate -Cdiscovery.type=single-node
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4200"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
