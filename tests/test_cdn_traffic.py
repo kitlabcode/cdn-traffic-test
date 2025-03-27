@@ -29,13 +29,17 @@ target_hostname = os.getenv("TARGET_HOSTNAME", "localhost")
 
 # Logging setup
 logging.basicConfig(
-    level=logging.INFO,  # Set the logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-    format="%(asctime)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    force=True,  # Force configuration even if already configured
     handlers=[
-        logging.StreamHandler(),  # Log to console
-        logging.FileHandler("cdn_traffic_test.log", mode="a")  # Log to a file
+        logging.StreamHandler(),  # Console output
+        logging.FileHandler("traffic_test.log", mode="a")  # File output
     ]
 )
+
+# Create a logger instance for this module
+logger = logging.getLogger(__name__)
 
 def execute_traffic_phase(url, duration, requests_per_second):
     response_times = []
@@ -48,6 +52,11 @@ def execute_traffic_phase(url, duration, requests_per_second):
     def send_request():
         nonlocal successful_requests
         try:
+            # First number (3.05) = connection timeout (TCP retransmission window)
+            # Second number (27) = read timeout:
+            #   - Allows for 1MB download at ~300 Kbps
+            #   - Includes buffer for network jitter
+            #   - Matches common CDN timeouts
             response = requests.get(url, timeout=(3.05, 27))
             response_times.append(response.elapsed.microseconds / 1000)
             status_codes[response.status_code] += 1
@@ -55,11 +64,11 @@ def execute_traffic_phase(url, duration, requests_per_second):
                 successful_requests += 1
             return response.status_code
         except requests.exceptions.Timeout as e:
-            logging.warning(f"Request timed out: {e}")
+            logger.warning(f"Request timed out: {e}")
             error_counts["Timeout Error"] += 1
             return None
         except requests.exceptions.RequestException as e:
-            logging.error(f"Request error: {e}")
+            logger.error(f"Request error: {e}")
             error_counts["Request Error"] += 1
             return None
 
@@ -88,17 +97,17 @@ def execute_traffic_phase(url, duration, requests_per_second):
                     try:
                         future.result(timeout=1)
                     except Exception as e:
-                        logging.error(f"Request failed: {e}")
+                        logger.error(f"Request failed: {e}")
                         error_counts["Execution Error"] += 1
 
                 if not_done:
-                    logging.error(f"{len(not_done)} requests did not complete")
+                    logger.error(f"{len(not_done)} requests did not complete")
                     error_counts["Incomplete Requests"] += len(not_done)
                     for future in not_done:
                         future.cancel()
                         
             except concurrent.futures.TimeoutError:
-                logging.error("Batch execution timed out")
+                logger.error("Batch execution timed out")
                 error_counts["Batch Timeout"] += 1
                 for future in futures:
                     future.cancel()
@@ -111,7 +120,7 @@ def collect_results(futures):
         try:
             results.append(future.result())
         except Exception as e:
-            logging.error(f"Request failed: {e}")
+            logger.error(f"Request failed: {e}")
     return results
 
 def get_test_scenarios():
@@ -145,7 +154,7 @@ def test_cdn_traffic(scenario_name, traffic_scenario):
 
     for phase in traffic_scenario.schedule:
         url = f"http://{target_hostname}/cache/{phase.payload_size}/{scenario_name.lower().replace(' ', '_')}_phase"
-        logging.info(f"Starting phase with {phase.requests_per_second} RPS for {phase.duration}s")
+        logger.info(f"Starting phase with {phase.requests_per_second} RPS for {phase.duration}s")
         
         response_times, status_codes, error_counts, successful_requests = execute_traffic_phase(
             url, 
@@ -161,7 +170,7 @@ def test_cdn_traffic(scenario_name, traffic_scenario):
             all_error_counts[error] += count
         total_successful_requests += successful_requests
         
-        logging.info(f"Completed phase: {successful_requests}/{phase.duration * phase.requests_per_second} successful requests")
+        logger.info(f"Completed phase: {successful_requests}/{phase.duration * phase.requests_per_second} successful requests")
 
     end_time = datetime.now()
 
@@ -189,15 +198,15 @@ def test_cdn_traffic(scenario_name, traffic_scenario):
 
     success_rate = (total_successful_requests / total_requests) * 100 if total_requests > 0 else 0
 
-    logging.info(f"\n--- {scenario_name.capitalize()} Traffic Test Results ---")
-    logging.info(f"Total Requests (approximate): {total_requests}")
-    logging.info(f"Response Time Percentiles (ms): p50={p50:.2f}, p95={p95:.2f}, p99={p99:.2f}, p999={p999:.2f}")
-    logging.info(f"Response Time Standard Deviation (ms): {std_dev:.2f}")
-    logging.info(f"Success Rate: {success_rate:.2f}%")
-    logging.info("Status Code Distribution: %s", dict(all_status_codes))
+    logger.info(f"\n--- {scenario_name.capitalize()} Traffic Test Results ---")
+    logger.info(f"Total Requests (approximate): {total_requests}")
+    logger.info(f"Response Time Percentiles (ms): p50={p50:.2f}, p95={p95:.2f}, p99={p99:.2f}, p999={p999:.2f}")
+    logger.info(f"Response Time Standard Deviation (ms): {std_dev:.2f}")
+    logger.info(f"Success Rate: {success_rate:.2f}%")
+    logger.info("Status Code Distribution: %s", dict(all_status_codes))
     if all_error_counts:
-        logging.info("Error Counts: %s", dict(all_error_counts))
-    logging.info(f"Start Time: {start_time}, End Time: {end_time}")
+        logger.info("Error Counts: %s", dict(all_error_counts))
+    logger.info(f"Start Time: {start_time}, End Time: {end_time}")
 
     # Save results to CrateDB
     result = TrafficTestResultModel(
@@ -219,5 +228,5 @@ def test_cdn_traffic(scenario_name, traffic_scenario):
         session.add(result)
         session.commit()
     except Exception as e:
-        logging.error(e)
+        logger.error(e)
         session.rollback()

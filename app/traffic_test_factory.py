@@ -14,58 +14,59 @@ class TrafficScenario:
 
 class TrafficTestFactory:
     BASE_SIZE = 1048576  # 1MB
+    MAX_RPS = 50  # Cap maximum requests per second
 
     @staticmethod
     def create_steady_load_test() -> TrafficScenario:
-        """Steady load at 100 MB/s"""
+        """Steady load at 25 MB/s"""
         return TrafficScenario(
             name="steady_load",
             schedule=[
                 TrafficPhase(
                     duration=10,
-                    requests_per_second=10,  # 100 MB/sec steady
-                    payload_size=TrafficTestFactory.BASE_SIZE * 10  # 10MB
+                    requests_per_second=25,  # 25 MB/sec
+                    payload_size=TrafficTestFactory.BASE_SIZE
                 )
             ]
         )
 
     @staticmethod
     def create_burst_test() -> TrafficScenario:
-        """Short burst at 125 MB/s"""
+        """Short burst at 40 MB/s"""
         return TrafficScenario(
             name="burst_test",
             schedule=[
                 TrafficPhase(
                     duration=1,
-                    requests_per_second=12.5,  # 125 MB/sec peak
-                    payload_size=TrafficTestFactory.BASE_SIZE * 10  # 10MB
+                    requests_per_second=40,  # 40 MB/sec
+                    payload_size=TrafficTestFactory.BASE_SIZE
                 )
             ]
         )
 
     @staticmethod
     def create_spike_pattern() -> TrafficScenario:
-        """Pattern with spike to 120 MB/s"""
+        """Pattern with spike to 35 MB/s"""
         return TrafficScenario(
             name="spike_pattern",
             schedule=[
-                TrafficPhase(duration=5, requests_per_second=5, payload_size=TrafficTestFactory.BASE_SIZE * 10),    # 50 MB/sec
-                TrafficPhase(duration=2, requests_per_second=12, payload_size=TrafficTestFactory.BASE_SIZE * 10),   # 120 MB/sec peak
-                TrafficPhase(duration=8, requests_per_second=3, payload_size=TrafficTestFactory.BASE_SIZE * 10)     # 30 MB/sec
+                TrafficPhase(duration=5, requests_per_second=15, payload_size=TrafficTestFactory.BASE_SIZE),    # 15 MB/sec
+                TrafficPhase(duration=2, requests_per_second=35, payload_size=TrafficTestFactory.BASE_SIZE),    # 35 MB/sec peak
+                TrafficPhase(duration=8, requests_per_second=10, payload_size=TrafficTestFactory.BASE_SIZE)     # 10 MB/sec
             ]
         )
 
     @staticmethod
     def create_ramp_up_down_test() -> TrafficScenario:
-        """Ramp up to 125 MB/s then back down"""
+        """Ramp up to 35 MB/s then back down"""
         return TrafficScenario(
             name="ramp_up_down",
             schedule=[
-                TrafficPhase(duration=2, requests_per_second=5, payload_size=TrafficTestFactory.BASE_SIZE * 10),    # 50 MB/sec
-                TrafficPhase(duration=2, requests_per_second=8, payload_size=TrafficTestFactory.BASE_SIZE * 10),    # 80 MB/sec
-                TrafficPhase(duration=2, requests_per_second=12.5, payload_size=TrafficTestFactory.BASE_SIZE * 10), # 125 MB/sec peak
-                TrafficPhase(duration=2, requests_per_second=8, payload_size=TrafficTestFactory.BASE_SIZE * 10),    # 80 MB/sec
-                TrafficPhase(duration=2, requests_per_second=5, payload_size=TrafficTestFactory.BASE_SIZE * 10)     # 50 MB/sec
+                TrafficPhase(duration=2, requests_per_second=15, payload_size=TrafficTestFactory.BASE_SIZE),    # 15 MB/sec
+                TrafficPhase(duration=2, requests_per_second=25, payload_size=TrafficTestFactory.BASE_SIZE),    # 25 MB/sec
+                TrafficPhase(duration=2, requests_per_second=35, payload_size=TrafficTestFactory.BASE_SIZE),    # 35 MB/sec peak
+                TrafficPhase(duration=2, requests_per_second=25, payload_size=TrafficTestFactory.BASE_SIZE),    # 25 MB/sec
+                TrafficPhase(duration=2, requests_per_second=15, payload_size=TrafficTestFactory.BASE_SIZE)     # 15 MB/sec
             ]
         )
 
@@ -74,7 +75,7 @@ class TrafficTestFactory:
         return TrafficScenario(
             name="sustained_load",
             schedule=[
-                TrafficPhase(duration=300, requests_per_second=8, payload_size=TrafficTestFactory.BASE_SIZE * 10)  # 80 MB/sec
+                TrafficPhase(duration=300, requests_per_second=25, payload_size=TrafficTestFactory.BASE_SIZE)  # 25 MB/sec
             ]
         )
 
@@ -83,9 +84,9 @@ class TrafficTestFactory:
         return TrafficScenario(
             name="mixed_payload_sizes",
             schedule=[
-                TrafficPhase(duration=30, requests_per_second=12.5, payload_size=TrafficTestFactory.BASE_SIZE * 10),  # 125 MB/sec
-                TrafficPhase(duration=30, requests_per_second=2.5, payload_size=TrafficTestFactory.BASE_SIZE * 50),   # 125 MB/sec
-                TrafficPhase(duration=30, requests_per_second=5, payload_size=TrafficTestFactory.BASE_SIZE * 25)      # 125 MB/sec
+                TrafficPhase(duration=30, requests_per_second=35, payload_size=TrafficTestFactory.BASE_SIZE),  # 35 MB/sec
+                TrafficPhase(duration=30, requests_per_second=7, payload_size=TrafficTestFactory.BASE_SIZE * 5),   # 35 MB/sec
+                TrafficPhase(duration=30, requests_per_second=14, payload_size=TrafficTestFactory.BASE_SIZE * 2.5)  # 35 MB/sec
             ]
         )
 
@@ -94,10 +95,10 @@ class TrafficTestFactory:
         return TrafficScenario(
             name="oscillating_load",
             schedule=[
-                TrafficPhase(duration=10, requests_per_second=5, payload_size=TrafficTestFactory.BASE_SIZE * 10),   # 50 MB/sec
-                TrafficPhase(duration=10, requests_per_second=8, payload_size=TrafficTestFactory.BASE_SIZE * 10),   # 80 MB/sec
-                TrafficPhase(duration=10, requests_per_second=5, payload_size=TrafficTestFactory.BASE_SIZE * 10),   # 50 MB/sec
-                TrafficPhase(duration=10, requests_per_second=8, payload_size=TrafficTestFactory.BASE_SIZE * 10)    # 80 MB/sec
+                TrafficPhase(duration=10, requests_per_second=15, payload_size=TrafficTestFactory.BASE_SIZE),   # 15 MB/sec
+                TrafficPhase(duration=10, requests_per_second=25, payload_size=TrafficTestFactory.BASE_SIZE),   # 25 MB/sec
+                TrafficPhase(duration=10, requests_per_second=15, payload_size=TrafficTestFactory.BASE_SIZE),   # 15 MB/sec
+                TrafficPhase(duration=10, requests_per_second=25, payload_size=TrafficTestFactory.BASE_SIZE)    # 25 MB/sec
             ]
         )
 
@@ -105,17 +106,17 @@ class TrafficTestFactory:
     def create_stress_test() -> TrafficScenario:
         """
         Stress test pattern:
-        - RPS = 12.5 requests/sec
-        - Size = 10MB per request
-        - Throughput = 125 MB/sec sustained
+        - RPS = 30 requests/sec
+        - Size = 1MB per request
+        - Throughput = 30 MB/sec sustained
         """
         return TrafficScenario(
             name="stress_test",
             schedule=[
                 TrafficPhase(
                     duration=60,
-                    requests_per_second=12.5,    
-                    payload_size=TrafficTestFactory.BASE_SIZE * 10  # 10MB
+                    requests_per_second=30,    # 30 MB/sec
+                    payload_size=TrafficTestFactory.BASE_SIZE
                 )
             ]
         )
