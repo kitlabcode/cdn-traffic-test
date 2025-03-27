@@ -11,9 +11,11 @@ import os
 from collections import defaultdict
 import json
 import logging
+from app.traffic_test_factory import TrafficTestFactory
+import math
 
 # CrateDB setup
-DATABASE_URL = f"crate://cratedb:4200"
+DATABASE_URL = os.getenv("DATABASE_URL", "crate://localhost:4200")
 
 engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
@@ -23,7 +25,7 @@ session = Session()
 Base.metadata.create_all(engine)
 
 # HOSTNAME setup
-HOSTNAME = os.getenv("HOSTNAME", "localhost")
+target_hostname = os.getenv("TARGET_HOSTNAME", "localhost")
 
 # Logging setup
 logging.basicConfig(
@@ -35,19 +37,7 @@ logging.basicConfig(
     ]
 )
 
-def load_traffic_scenarios(filepath="traffic_scenarios.json"):
-    """Loads traffic scenarios from a JSON file."""
-    try:
-        with open(filepath, 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        logging.error(f"Error: File not found at {filepath}")
-        return []
-    except json.JSONDecodeError as e:
-        logging.error(f"Error: Could not decode JSON in {filepath}: {e}")
-        return []
-
-def execute_traffic_phase(url, duration, requests_per_second, concurrency, payload_size):
+def execute_traffic_phase(url, duration, requests_per_second):
     response_times = []
     status_codes = defaultdict(int)
     error_counts = defaultdict(int)
@@ -58,62 +48,133 @@ def execute_traffic_phase(url, duration, requests_per_second, concurrency, paylo
     def send_request():
         nonlocal successful_requests
         try:
-            response = requests.get(url)
+            response = requests.get(url, timeout=(3.05, 27))
             response_times.append(response.elapsed.microseconds / 1000)
-            status_codes[response.status_code] += 1  # Increment status code count
+            status_codes[response.status_code] += 1
             if response.status_code == 200:
                 successful_requests += 1
             return response.status_code
+        except requests.exceptions.Timeout as e:
+            logging.warning(f"Request timed out: {e}")
+            error_counts["Timeout Error"] += 1
+            return None
         except requests.exceptions.RequestException as e:
+            logging.error(f"Request error: {e}")
             error_counts["Request Error"] += 1
             return None
 
     if num_requests > 0:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as executor:
+        with concurrent.futures.ThreadPoolExecutor() as executor:  # Let Python manage pool size
             futures = []
-            for _ in range(num_requests):
+            start_time = time.time()
+            
+            # Submit all requests at their scheduled times
+            for i in range(num_requests):
+                target_time = start_time + (i * interval)
+                now = time.time()
+                if now < target_time:
+                    time.sleep(target_time - now)
                 futures.append(executor.submit(send_request))
-                time.sleep(interval)
-            results = [future.result() for future in concurrent.futures.as_completed(futures)]
+
+            # Wait for completion
+            try:
+                done, not_done = concurrent.futures.wait(
+                    futures,
+                    timeout=duration + 30,  # Allow extra time for completion
+                    return_when=concurrent.futures.ALL_COMPLETED
+                )
+                
+                for future in done:
+                    try:
+                        future.result(timeout=1)
+                    except Exception as e:
+                        logging.error(f"Request failed: {e}")
+                        error_counts["Execution Error"] += 1
+
+                if not_done:
+                    logging.error(f"{len(not_done)} requests did not complete")
+                    error_counts["Incomplete Requests"] += len(not_done)
+                    for future in not_done:
+                        future.cancel()
+                        
+            except concurrent.futures.TimeoutError:
+                logging.error("Batch execution timed out")
+                error_counts["Batch Timeout"] += 1
+                for future in futures:
+                    future.cancel()
+
     return response_times, status_codes, error_counts, successful_requests
 
-@pytest.mark.parametrize("traffic_scenario", load_traffic_scenarios())
-def test_cdn_traffic(traffic_scenario):
-    scenario_name = traffic_scenario.get("name", "generic_scenario")
+def collect_results(futures):
+    results = []
+    for future in concurrent.futures.as_completed(futures):
+        try:
+            results.append(future.result())
+        except Exception as e:
+            logging.error(f"Request failed: {e}")
+    return results
+
+def get_test_scenarios():
+    factory = TrafficTestFactory()
+    scenarios = [
+        factory.create_steady_load_test(),
+        factory.create_burst_test(),
+        factory.create_spike_pattern(),
+        factory.create_ramp_up_down_test(),
+        factory.create_sustained_load_test(),
+        factory.create_mixed_payload_test(),
+        factory.create_oscillating_pattern(),
+        factory.create_stress_test()
+    ]
+    # Return tuple of (name, scenario) for better test identification
+    return [(scenario.name, scenario) for scenario in scenarios]
+
+@pytest.mark.parametrize("scenario_name,traffic_scenario", get_test_scenarios())
+def test_cdn_traffic(scenario_name, traffic_scenario):
     all_response_times = []
     all_status_codes = defaultdict(int)
     all_error_counts = defaultdict(int)
     total_successful_requests = 0
     start_time = datetime.now()
 
-    # Calculate total_requests before the assertion
+    # Calculate total_requests using ceil to round up fractional requests
     total_requests = sum(
-        phase.get("duration", 1) * phase.get("requests_per_second", 1)
-        for phase in traffic_scenario.get("schedule", [])
+        math.ceil(phase.duration * phase.requests_per_second)
+        for phase in traffic_scenario.schedule
     )
 
-    for phase in traffic_scenario.get("schedule", []):
-        duration = phase.get("duration", 1)
-        requests_per_second = phase.get("requests_per_second", 1)
-        concurrency = phase.get("concurrency", 1)
-        payload_size = phase.get("payload_size", 1)
-        url = f"http://{HOSTNAME}/cache/{payload_size}/{scenario_name.lower().replace(' ', '_')}_phase"
-
+    for phase in traffic_scenario.schedule:
+        url = f"http://{target_hostname}/cache/{phase.payload_size}/{scenario_name.lower().replace(' ', '_')}_phase"
+        logging.info(f"Starting phase with {phase.requests_per_second} RPS for {phase.duration}s")
+        
         response_times, status_codes, error_counts, successful_requests = execute_traffic_phase(
-            url, duration, requests_per_second, concurrency, payload_size
+            url, 
+            phase.duration, 
+            phase.requests_per_second, 
         )
+        
+        # Aggregate results
         all_response_times.extend(response_times)
         for code, count in status_codes.items():
             all_status_codes[code] += count
         for error, count in error_counts.items():
             all_error_counts[error] += count
         total_successful_requests += successful_requests
-        time.sleep(0.1)  # Small pause between phases
+        
+        logging.info(f"Completed phase: {successful_requests}/{phase.duration * phase.requests_per_second} successful requests")
 
     end_time = datetime.now()
 
-    # Perform assertions and save results
-    assert all_status_codes.get(200, 0) == total_requests, f"Some requests failed: {all_status_codes}, Errors: {all_error_counts}"
+    # Update assertion to allow for fractional RPS
+    min_acceptable_requests = sum(
+        math.floor(phase.duration * phase.requests_per_second)
+        for phase in traffic_scenario.schedule
+    )
+    
+    assert all_status_codes.get(200, 0) >= min_acceptable_requests, \
+        f"Too few successful requests. Got: {all_status_codes.get(200, 0)}, " \
+        f"Expected at least: {min_acceptable_requests}. " \
+        f"Status codes: {dict(all_status_codes)}, Errors: {dict(all_error_counts)}"
 
     # Calculate and log metrics
     if all_response_times:
